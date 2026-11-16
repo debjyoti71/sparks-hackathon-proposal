@@ -1,0 +1,5 @@
+gru_w,spell_f1,macro_f1,decoder
+0.0,0.604,0.8487,"DecodeConfig(c_ha=20.0, c_ld=50.0, min_poss_s=1.0, min_dead_s=0.0, stride=1, sw_beta=3.0)"
+0.33,0.6455,0.8594,"DecodeConfig(c_ha=20.0, c_ld=25.0, min_poss_s=0.0, min_dead_s=0.0, stride=1, sw_beta=3.0)"
+0.67,0.6755,0.8633,"DecodeConfig(c_ha=20.0, c_ld=25.0, min_poss_s=0.0, min_dead_s=0.0, stride=1, sw_beta=3.0)"
+1.0,0.6716,0.8538,"DecodeConfig(c_ha=40.0, c_ld=25.0, min_poss_s=0.0, min_dead_s=0.0, stride=1, sw_beta=6.0)"

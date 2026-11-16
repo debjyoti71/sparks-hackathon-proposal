@@ -1,0 +1,37 @@
+game,mode,method,spell_f1,macro_f1,n_gt,n_pred
+Sample_Game_1,sim,1. nearest-player baseline (w=50),0.1838,0.4025,295,678
+Sample_Game_1,sim,2. rule engine alone (teammate),0.1865,0.4724,295,591
+Sample_Game_1,sim,"3. models, argmax",0.1317,0.8178,295,2056
+Sample_Game_1,sim,4. models + default decoder,0.5437,0.8234,295,209
+Sample_Game_1,sim,5. models + Smart Tagging + tuned decoder,0.5992,0.8362,295,231
+Sample_Game_1,sim,6. models + Smart Tagging + rule priors + tuned decoder,0.5992,0.8362,295,231
+Sample_Game_1,raw,1. nearest-player baseline (w=50),0.3641,0.7151,295,552
+Sample_Game_1,raw,2. rule engine alone (teammate),0.2388,0.4384,295,596
+Sample_Game_1,raw,"3. models, argmax",0.2089,0.8522,295,1566
+Sample_Game_1,raw,4. models + default decoder,0.6274,0.8541,295,224
+Sample_Game_1,raw,5. models + Smart Tagging + tuned decoder,0.6794,0.8629,295,259
+Sample_Game_1,raw,6. models + Smart Tagging + rule priors + tuned decoder,0.6794,0.8629,295,259
+Sample_Game_2,sim,1. nearest-player baseline (w=50),0.1942,0.4168,287,679
+Sample_Game_2,sim,2. rule engine alone (teammate),0.2333,0.5043,287,543
+Sample_Game_2,sim,"3. models, argmax",0.1586,0.8124,287,1484
+Sample_Game_2,sim,4. models + default decoder,0.5122,0.8204,287,205
+Sample_Game_2,sim,5. models + Smart Tagging + tuned decoder,0.5442,0.8298,287,226
+Sample_Game_2,sim,6. models + Smart Tagging + rule priors + tuned decoder,0.5442,0.8298,287,226
+Sample_Game_2,raw,1. nearest-player baseline (w=50),0.3827,0.7636,287,520
+Sample_Game_2,raw,2. rule engine alone (teammate),0.2674,0.4704,287,576
+Sample_Game_2,raw,"3. models, argmax",0.2276,0.8496,287,1184
+Sample_Game_2,raw,4. models + default decoder,0.6077,0.8533,287,206
+Sample_Game_2,raw,5. models + Smart Tagging + tuned decoder,0.6158,0.8565,287,232
+Sample_Game_2,raw,6. models + Smart Tagging + rule priors + tuned decoder,0.6158,0.8565,287,232
+Sample_Game_3,sim,1. nearest-player baseline (w=50),0.2115,0.4594,348,779
+Sample_Game_3,sim,2. rule engine alone (teammate),0.2126,0.5376,348,585
+Sample_Game_3,sim,"3. models, argmax",0.1395,0.8225,348,1958
+Sample_Game_3,sim,4. models + default decoder,0.4812,0.8253,348,233
+Sample_Game_3,sim,5. models + Smart Tagging + tuned decoder,0.5202,0.845,348,271
+Sample_Game_3,sim,6. models + Smart Tagging + rule priors + tuned decoder,0.5202,0.845,348,271
+Sample_Game_3,raw,1. nearest-player baseline (w=50),0.3123,0.7717,348,706
+Sample_Game_3,raw,2. rule engine alone (teammate),0.2502,0.5283,348,629
+Sample_Game_3,raw,"3. models, argmax",0.1895,0.8547,348,1700
+Sample_Game_3,raw,4. models + default decoder,0.5713,0.8579,348,245
+Sample_Game_3,raw,5. models + Smart Tagging + tuned decoder,0.6113,0.8712,348,290
+Sample_Game_3,raw,6. models + Smart Tagging + rule priors + tuned decoder,0.6113,0.8712,348,290

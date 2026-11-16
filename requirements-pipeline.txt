@@ -1,0 +1,26 @@
+# Possession pipeline (possession/ + run_pipeline.py). Exact versions used to produce the
+# submission, on CPython 3.13.6 (Windows 11, x86-64).
+#
+#   python -m venv venv
+#   venv\Scripts\python -m pip install -r requirements-pipeline.txt      (Windows)
+#   venv/bin/python -m pip install -r requirements-pipeline.txt          (Linux / macOS)
+numpy==2.5.4
+pandas==3.1.0
+python-dateutil==4.0.0
+tzdata==2026.6
+scipy==1.18.1
+lightgbm==4.7.0
+
+# Only for `run_pipeline.py train --dfl` (loads the open DFL / IDSSE matches).
+kloppy==3.19.1
+
+# Optional: only for notebooks/possession_pipeline.ipynb (plots and interactive run).
+# matplotlib==3.11.2
+# ipykernel==7.4.0
+
+# PyTorch is REQUIRED (the final pipeline blends in a small GRU). Install it separately, BEFORE
+# this file, from the PyTorch index -- the CPU build is enough to reproduce the submission:
+#   pip install torch==2.7.1 --index-url https://download.pytorch.org/whl/cpu
+# or, to also train the GRU on an NVIDIA GPU (train --gru-device cuda; prediction still runs on CPU):
+#   pip install torch==2.7.1 --index-url https://download.pytorch.org/whl/cu126
+torch==2.7.1

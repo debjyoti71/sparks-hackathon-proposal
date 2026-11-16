@@ -1,0 +1,7 @@
+game,mode,dead_acc,dead_logloss,dead_base_rate,ctrl_acc,ctrl_logloss
+Sample_Game_1,sim,0.8781,0.3553,0.4846,0.8732,0.2988
+Sample_Game_1,raw,0.8901,0.3304,0.4846,0.8948,0.2288
+Sample_Game_2,sim,0.8711,0.4154,0.3927,0.8424,0.3581
+Sample_Game_2,raw,0.886,0.3873,0.3927,0.8854,0.2456
+Sample_Game_3,sim,0.8948,0.3159,0.3206,0.8648,0.2985
+Sample_Game_3,raw,0.911,0.286,0.3206,0.8883,0.2417

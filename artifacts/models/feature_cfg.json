@@ -1,0 +1,9 @@
+{
+  "windows": [
+    25,
+    75,
+    175
+  ],
+  "clip_s": 20.0,
+  "directional": true
+}

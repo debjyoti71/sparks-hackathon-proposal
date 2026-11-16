@@ -1,0 +1,7 @@
+method,spell_f1,macro_f1
+1. nearest-player baseline (w=50),0.2748,0.5882
+2. rule engine alone (teammate),0.2315,0.4919
+"3. models, argmax",0.1759,0.8349
+4. models + default decoder,0.5572,0.8391
+5. models + Smart Tagging + tuned decoder,0.595,0.8503
+6. models + Smart Tagging + rule priors + tuned decoder,0.595,0.8503

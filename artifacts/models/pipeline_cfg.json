@@ -1,0 +1,10 @@
+{
+  "use_stack": false,
+  "variant": "dir_chal",
+  "n_rounds": 350,
+  "gru_w": 0.67,
+  "dfl": false,
+  "dfl_smooth_s": 0.0,
+  "oof_spell_f1_models_st": 0.6755072632846162,
+  "oof_spell_f1_stacker_st": -1.0
+}

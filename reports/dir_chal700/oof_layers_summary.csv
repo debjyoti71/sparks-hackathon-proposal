@@ -1,0 +1,28 @@
+mode,method,spell_f1,macro_f1,n_pred,n_gt
+chal,1. nearest-player baseline (w=50),0.2256,0.4536,466.0,310.0
+chal,2. rule engine alone (teammate),0.2112,0.4778,466.6667,310.0
+chal,"3. models, argmax",0.1524,0.8015,1723.0,310.0
+chal,4. models + default decoder,0.5068,0.8063,223.0,310.0
+chal,5. models + Smart Tagging + tuned decoder,0.5548,0.8247,238.0,310.0
+chal,6. models + STACKER + Smart Tagging + tuned decoder,0.5447,0.8152,227.0,310.0
+chal,7. SELECTED pipeline,0.5548,0.8247,238.0,310.0
+chal,8. oracle: selected + perfect dead/live,0.5963,0.9014,210.6667,310.0
+chal,9. oracle: selected + perfect team,0.8524,0.8816,343.6667,310.0
+raw,1. nearest-player baseline (w=50),0.353,0.7501,592.6667,310.0
+raw,2. rule engine alone (teammate),0.2521,0.479,600.3333,310.0
+raw,"3. models, argmax",0.2211,0.8571,1448.0,310.0
+raw,4. models + default decoder,0.6089,0.8582,219.6667,310.0
+raw,5. models + Smart Tagging + tuned decoder,0.648,0.8672,251.0,310.0
+raw,6. models + STACKER + Smart Tagging + tuned decoder,0.6422,0.8616,234.3333,310.0
+raw,7. SELECTED pipeline,0.648,0.8672,251.0,310.0
+raw,8. oracle: selected + perfect dead/live,0.6869,0.931,227.0,310.0
+raw,9. oracle: selected + perfect team,0.8899,0.9056,344.6667,310.0
+sim,1. nearest-player baseline (w=50),0.1965,0.4263,712.0,310.0
+sim,2. rule engine alone (teammate),0.2108,0.5047,573.0,310.0
+sim,"3. models, argmax",0.1785,0.8335,1549.0,310.0
+sim,4. models + default decoder,0.5387,0.8341,213.3333,310.0
+sim,5. models + Smart Tagging + tuned decoder,0.5859,0.8478,237.3333,310.0
+sim,6. models + STACKER + Smart Tagging + tuned decoder,0.5864,0.8386,229.0,310.0
+sim,7. SELECTED pipeline,0.5859,0.8478,237.3333,310.0
+sim,8. oracle: selected + perfect dead/live,0.6228,0.9153,214.3333,310.0
+sim,9. oracle: selected + perfect team,0.8647,0.8973,339.3333,310.0

@@ -1,0 +1,19 @@
+mode,method,spell_f1,macro_f1,n_pred,n_gt
+chal,1. nearest-player baseline (w=50),0.2256,0.4536,466.0,310.0
+chal,2. rule engine alone (teammate),0.2112,0.4778,466.6667,310.0
+chal,"3. models, argmax",0.1387,0.7925,1794.6667,310.0
+chal,4. models + default decoder,0.4777,0.7979,221.3333,310.0
+chal,5. models + Smart Tagging + tuned decoder,0.5257,0.8213,235.3333,310.0
+chal,6. models + Smart Tagging + rule priors + tuned decoder,0.5257,0.8213,235.3333,310.0
+raw,1. nearest-player baseline (w=50),0.353,0.7501,592.6667,310.0
+raw,2. rule engine alone (teammate),0.2521,0.479,600.3333,310.0
+raw,"3. models, argmax",0.2136,0.8526,1434.3333,310.0
+raw,4. models + default decoder,0.5996,0.8525,226.0,310.0
+raw,5. models + Smart Tagging + tuned decoder,0.6274,0.8621,259.6667,310.0
+raw,6. models + Smart Tagging + rule priors + tuned decoder,0.6274,0.8621,259.6667,310.0
+sim,1. nearest-player baseline (w=50),0.1965,0.4263,712.0,310.0
+sim,2. rule engine alone (teammate),0.2108,0.5047,573.0,310.0
+sim,"3. models, argmax",0.1585,0.8213,1639.0,310.0
+sim,4. models + default decoder,0.4966,0.8245,211.6667,310.0
+sim,5. models + Smart Tagging + tuned decoder,0.5469,0.8392,240.6667,310.0
+sim,6. models + Smart Tagging + rule priors + tuned decoder,0.5469,0.8392,240.6667,310.0

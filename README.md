@@ -1,5 +1,41 @@
 # More than a Hack 2027 — Phase 1: Ball Possession
 
+> ## Our entry: reproducing the submission
+>
+> Approach, assets, training data, possession rules and limitations are in the technical
+> document **[TECHNICAL_REPORT.md](TECHNICAL_REPORT.md)**. Code: [possession/](possession/) +
+> [run_pipeline.py](run_pipeline.py). The organisers' original README continues below the line.
+>
+> **1. Environment** (CPython 3.13.6; all versions pinned)
+> ```bash
+> python -m venv venv
+> venv\Scripts\python -m pip install -r requirements-pipeline.txt     # Linux/macOS: venv/bin/python
+> ```
+> **2. Data** (neither is in this repository)
+> - the competition bundle unpacked into `data/` exactly as [DATA.md](DATA.md) describes;
+> - only needed to retrain: the Metrica Sports open sample data in `external_data/`, so that
+>   `external_data/data/Sample_Game_1`, `Sample_Game_2` and `Sample_Game_3` exist:
+>   `git clone https://github.com/metrica-sports/sample-data external_data`
+>
+> **3. Regenerate the submission** from the committed models in [artifacts/models/](artifacts/models/)
+> (trained only on the Metrica games):
+> ```bash
+> venv\Scripts\python run_pipeline.py predict --team <team_name> --no-cache
+> ```
+> This writes `evaluation/results/<team_name>.csv`, runs `evaluation/validate_submission.py` on it
+> and prints its SHA-256, which should match the one in the technical document. Takes a few minutes.
+>
+> **4. Optional: retrain from scratch** on the external games (leave-one-game-out CV, decoder
+> tuning, final fit; writes models to `artifacts/models/` and CV tables to [reports/](reports/)):
+> ```bash
+> venv\Scripts\python run_pipeline.py train
+> venv\Scripts\python run_pipeline.py all --team <team_name>      # train, then predict
+> ```
+> `train` never opens `data/` or any ground truth. The interactive version of the same steps is
+> [notebooks/possession_pipeline.ipynb](notebooks/possession_pipeline.ipynb).
+
+---
+
 **Organised by [Metrica Sports](https://metrica-sports.com), [FC Barcelona](https://www.fcbarcelona.com)
 and the [Mobile World Capital Barcelona](https://www.mwcbarcelona.com)**, at the Talent Arena in Barcelona.
 
@@ -192,5 +228,3 @@ competition only, under the terms you accept at enrolment.
   url    = {https://github.com/metrica-sports/more-than-a-hack-2027}
 }
 ```
-#   M o r e - T h a n - A - H a c k - 2 0 2 7 - - - I n i t i a l - C h a l l e n g e - - - 9  
- 

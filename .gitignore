@@ -62,3 +62,12 @@ __pycache__/
 venv/
 env/
 .DS_Store
+
+# -- possession pipeline: external training data and generated artifacts ---------------------
+# external_data/ is the Metrica open sample data: downloaded by the user, not redistributed here.
+# artifacts/cache/ holds parsed copies of the provided match (data/) and must never be committed.
+# artifacts/models/ IS committed: LightGBM models + decoder config trained only on external_data/,
+# so `python run_pipeline.py predict` regenerates the submission byte for byte.
+external_data/
+artifacts/*
+!artifacts/models/
