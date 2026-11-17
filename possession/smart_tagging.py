@@ -321,14 +321,29 @@ def apply_smart_tagging_priors(match, instances, p_dead, p_home,
     # possession remains with the kicking team while the ball is airborne/traveling.
     # An opponent merely under the flight path in 2D does NOT intercept unless the ball decelerates
     # (<= 6.0 m/s) upon reception or physical control.
+    W, Hh = match.pitch
+    out_of_pitch = (filled[:, 0] < -1.0) | (filled[:, 0] > W + 1.0) | (filled[:, 1] < -1.0) | (filled[:, 1] > Hh + 1.0)
+    max_hang_frames = int(4.0 * fps)
     in_flight = False
     flight_team = None
+    flight_start = 0
+
     for t in range(1, T):
-        if not in_flight and bsp[t] >= 12.0 and bsp[t - 1] < 12.0:
+        # Generalization guards: reset on period transitions or ball going out of bounds
+        if match.period[t] != match.period[t - 1] or out_of_pitch[t]:
+            in_flight = False
+            flight_team = None
+            continue
+
+        if not in_flight and bsp[t] >= 12.0 and bsp[t - 1] < 12.0 and logit_dead[t - 1] < 1.0:
             in_flight = True
+            flight_start = t
             flight_team = 0 if logit_home[t - 1] >= 0.0 else 1
         elif in_flight:
-            if bsp[t] >= 6.0:
+            if t - flight_start > max_hang_frames:
+                in_flight = False
+                flight_team = None
+            elif bsp[t] >= 6.0:
                 if flight_team == 0:
                     logit_home[t] = max(logit_home[t], 1.1)
                 else:
