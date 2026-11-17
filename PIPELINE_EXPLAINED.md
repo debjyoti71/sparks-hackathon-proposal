@@ -59,7 +59,7 @@ The order is the same for the external games (validation) and the challenge matc
 | 2 | Ball bridging | `possession/ball.py` | Fills remaining ball gaps: a curve through both ends for gaps up to 4 s, a straight line for longer ones. The models are told how long each gap is. |
 | 3 | Features | `possession/features.py` | About 130 per-frame features: distances from each team to the ball, who touched it last and who touches it next, pass bridges, team speed, shape and coherence, plus the **attack-direction features** (section 6). |
 | 4 | Models | `possession/models.py` | Three LightGBM models: **P(dead)**, **P(home has it, given alive)**, and the **turnover detector**, P(the ball passes directly to the other team within ±0.5 s). Team symmetry is enforced by training on both team orientations. |
-| 4b | GRU | `possession/gru.py` | A small **bidirectional GRU** (a recurrent neural network) reads the same features as a sequence over the whole half and predicts the same three probabilities. They are blended with the tree models' (weight 0.67 on the GRU, in log-odds), so every later step sees the blend. |
+| 4b | GRU ensemble | `possession/gru.py` | An **ensemble of 5 bidirectional GRUs** (recurrent neural networks, different random seeds, averaged) reads the same features as a sequence over the whole half and predicts the same three probabilities. They are blended with the tree models' (weight 0.8 on the GRUs, in log-odds), so every later step sees the blend. |
 | 5 | Smart Tagging priors | `possession/smart_tagging.py` | Challenge tags nudge the probabilities. Set-piece windows mark dead ball until the restart kick, which is found from ball acceleration. Attacking-phase tags favour the tagged team; defending-phase tags favour the other team. On the external games we simulate tags from their events. |
 | 6 | Decoder | `possession/decode.py` | Viterbi (most-likely-sequence) decoding over H/A/D with a cost per switch, then very short runs are merged. **The H↔A switch cost is cheap where the turnover detector fires and expensive elsewhere.** All decoder settings are tuned on OOF predictions. |
 | 7 | Output | `possession/pipeline.py`, `run_pipeline.py` | Forces the published pre-kick-off part of the 2nd half to `D`, writes the CSV, runs the official validator and prints the file's SHA-256. |
@@ -72,17 +72,18 @@ Parts that are in the code but **switched off**, because they lost out of fold (
 
 - Training variant `dir_chal`: 6 masked copies of each training game (`sim`×2, `raw`×2, `chal`×2),
   base features plus attack-direction features, 350 boosting rounds.
-- GRU blended in with weight **0.67** (`pipeline_cfg.json` → `gru_w`), trained 10 epochs (on GPU).
-- Decoder (`decode_cfg.json`): `c_ha = 20`, `c_ld = 25`, `sw_beta = 3.0` (turnover-detector
+- GRU ensemble: **5 networks** (seeds 0–4), 128 units per direction, 1 layer, 15 epochs, trained
+  on GPU. Blended in with weight **0.8** (`pipeline_cfg.json` → `gru_w`).
+- Decoder (`decode_cfg.json`): `c_ha = 40`, `c_ld = 50`, `sw_beta = 6.0` (turnover-detector
   weight), `min_poss_s = 0.0`, `min_dead_s = 0.0`.
 - Stacker off, rule priors 0, no DFL data.
-- Reference SHA-256 of the submission CSV this produces:
-  `f78df2627a0794535ac4925f03e5a16ef3ec687c9d5d59e39241b73f38546339`.
+- Reference SHA-256 of the submission CSV this produces (two `predict` runs gave the same hash):
+  `5bbb327135ae54ec2557a012b047cc176d4b0dc16b4f69c38eaa8475c961f840`.
 
 ### The models themselves (what is in `artifacts/models/`)
 
-There are **four models**: three LightGBM gradient-boosted decision-tree models (350 trees each, 31
-leaves, learning rate 0.05, saved as plain-text files) and one small neural network (the GRU). Each
+There are three LightGBM gradient-boosted decision-tree models (350 trees each, 31 leaves, learning
+rate 0.05, saved as plain-text files) and an ensemble of five small neural networks (the GRUs). Each
 answers yes/no questions for **every frame** with a probability. None of them decides the final
 label alone; the blend and the decoder (step 6) combine them.
 
@@ -91,15 +92,17 @@ label alone; the blend and the decoder (step 6) combine them.
 | `dead.txt` | "Is the ball dead in this frame?" → **P(dead)** | every frame in play | 51 team-neutral features: ball speed and acceleration, how long the ball has been unseen, ball distance to the lines, how slow and spread out the players are, all over 1/3/7 s windows |
 | `ctrl.txt` | "Given the ball is alive, does the home team have it?" → **P(home)** | only frames where the ball is alive | the same 51 plus 82 **own-vs-opponent** features (59 base + 23 attack-direction): each team's distance to the ball, last and next touch, pass bridges, team shape and speed, forward motion and block height |
 | `switch.txt` | "Does the ball pass directly to the other team within ±0.5 s of this frame?" → **P(turnover)** | every frame in play; positive within 0.5 s of a direct H↔A change | same inputs as `ctrl.txt` |
-| `gru.pt` (+ `gru_cfg.json`, `gru_norm.npz`) | all three questions at once: P(dead), P(own team has it), P(turnover) | every 4th frame of each half, as one sequence | the same 133 features, standardised (`gru_norm.npz` holds the means and spreads) |
+| `gru.pt`, `gru_1.pt` … `gru_4.pt` (+ `gru_cfg.json`, `gru_norm.npz`) | all three questions at once: P(dead), P(own team has it), P(turnover) | every 4th frame of each half, as one sequence | the same 133 features, standardised (`gru_norm.npz` holds the means and spreads) |
 
-**The GRU in more detail.** A linear layer (133 → 64, ReLU, dropout 0.1) feeds a 1-layer
-bidirectional GRU with 64 units per direction, then a linear layer outputs 3 log-odds per step.
-Because it is bidirectional and reads the whole half, each frame's prediction uses what happened
-before *and* after it. That is the context a possession boundary needs, and the trees can't see
-it. It is trained on 41-second chunks (256 steps), batch 32, AdamW (learning rate 1e-3), 10
-epochs. Each sequence is fed twice, with home and with away as "own" team, and the two predictions
-are averaged. Predictions are made every 4th frame and interpolated in between.
+**The GRUs in more detail.** Each network is a linear layer (133 → 128, ReLU, dropout 0.1) feeding
+a 1-layer bidirectional GRU with 128 units per direction, then a linear layer that outputs 3
+log-odds per step. Because it is bidirectional and reads the whole half, each frame's prediction
+uses what happened before *and* after it. That is the context a possession boundary needs, and the
+trees can't see it. Each is trained on 41-second chunks (256 steps), batch 32, AdamW (learning rate
+1e-3), 15 epochs. Each sequence is fed twice, with home and with away as "own" team, and the two
+predictions are averaged. Five networks are trained identically except for the random seed (0–4)
+and their probabilities averaged. A single small network is noisy; averaging five removes much of
+that noise. Predictions are made every 4th frame and interpolated in between.
 
 How they are trained:
 
@@ -113,8 +116,8 @@ How they are trained:
 
 How they are combined, frame by frame:
 
-1. Each tree probability is blended with the GRU's: log-odds = 0.33·tree + 0.67·GRU. This applies to
-   P(dead), P(home) and P(turnover).
+1. Each tree probability is blended with the GRU ensemble's: log-odds = 0.2·tree + 0.8·GRU. This
+   applies to P(dead), P(home) and P(turnover).
    The blended P(dead) and P(home) give three scores per frame: P(H) = (1−P(dead))·P(home),
    P(A) = (1−P(dead))·(1−P(home)), P(D) = P(dead).
 2. Smart Tagging nudges those probabilities (set pieces → dead until the restart; phase tags →
@@ -122,7 +125,7 @@ How they are combined, frame by frame:
 3. The Viterbi decoder picks the single most likely H/A/D sequence for each half. Switching costs
    are `c_ld` between live and dead, and `c_ha` between H and A. **`switch.txt` makes `c_ha`
    frame-dependent:** cheaper where P(turnover) is above its usual level, dearer where it is below.
-   `sw_beta = 3` sets how strongly.
+   `sw_beta = 6` sets how strongly.
 4. Runs shorter than `min_poss_s` / `min_dead_s` are merged into a neighbour.
 
 The other files in the folder are not models: `names.json` (feature order each model expects),
@@ -151,12 +154,12 @@ venv\Scripts\python -m pip install -r requirements-pipeline.txt
 # regenerate the submission from the committed models (a few minutes)
 venv\Scripts\python run_pipeline.py predict --team <team_name> --no-cache
 
-# retrain everything from the external games (~20-25 min with a GPU, much longer on CPU)
+# retrain everything from the external games (~1 h with a GPU, many hours on CPU)
 venv\Scripts\python run_pipeline.py train --gru-device cuda
 ```
 
 **Check you reproduced it:** the last line of `predict` prints the CSV's SHA-256. It should be
-`f78df2627a0794535ac4925f03e5a16ef3ec687c9d5d59e39241b73f38546339`. If it differs, first compare
+`5bbb327135ae54ec2557a012b047cc176d4b0dc16b4f69c38eaa8475c961f840`. If it differs, first compare
 `pip freeze` against `requirements-pipeline.txt` (numpy, pandas, lightgbm, torch) and the Python
 version (3.13.6).
 
@@ -181,7 +184,9 @@ Useful `train` flags, all optional. The defaults are the final configuration.
 | `--rounds N` | LightGBM boosting rounds |
 | `--no-gru` | skip the GRU (trees only); by default it is trained and kept only if it wins OOF |
 | `--gru-device cpu / cuda` | where the GRU trains (prediction always runs on CPU) |
-| `--gru-epochs N`, `--torch-threads N` | GRU training length; CPU threads (fixed, for determinism) |
+| `--gru-seeds N` | GRU ensemble size (default 5) |
+| `--gru-hidden N`, `--gru-layers N` | GRU size (default 128 units, 1 layer) |
+| `--gru-epochs N`, `--torch-threads N` | GRU training length (default 15); CPU threads (fixed, for determinism) |
 
 ### Reading the training output
 
@@ -202,9 +207,9 @@ The last table, "mean over all held-out games and masks", has one row per method
 | 9 | oracle: our dead/live split, but perfect team decisions |
 
 Rows 8 and 9 are not achievable scores. They swap in the true labels for half of the problem to
-show where the remaining errors are. In the final run, row 9 (0.88) against row 7 (0.68) says
-**most of the remaining loss is still in H vs A decisions (turnovers)**. Row 8 (0.71) says perfect
-dead/live boundaries would add only about +0.035.
+show where the remaining errors are. In the final run, row 9 (0.89) against row 7 (0.69) says
+**most of the remaining loss is still in H vs A decisions (turnovers)**. Row 8 (0.73) says perfect
+dead/live boundaries would add only about +0.04.
 
 ## 6. The three changes that worked, explained
 
@@ -231,6 +236,13 @@ point to a real effect, not luck. In every fold it trains only on the two other 
 its feature normalisation. The earlier stacker, which only saw the tree outputs, lost; the GRU sees
 the raw features over time.
 
+**Then: 5 GRUs instead of 1, and bigger ones (+0.017 more).** Averaging five networks trained with
+different seeds took it to 0.6876. Making each one bigger (64 → 128 units) and training longer
+(10 → 15 epochs) took it to **0.6926**. A finer blend-weight search also mattered: both runs chose a
+weight (0.9 and 0.8) between the old grid points 0.67 and 1.0. Against the single GRU, the final
+ensemble is better in 7 of 9 held-out runs, including all three challenge-like `chal` runs (+0.009,
++0.023, +0.023). One run ties, and one is slightly worse (−0.003).
+
 ## 7. Everything we tried
 
 All numbers are mean OOF spellF1 over 3 Metrica games × 3 masks (sim, raw, chal), unless noted.
@@ -252,14 +264,17 @@ All numbers are mean OOF spellF1 over 3 Metrica games × 3 masks (sim, raw, chal
 | 12 | Wider detector-weight search (up to 8) | 0.6074, identical (weight 3 still best) | no change | |
 | 13 | + 7 open DFL Bundesliga matches as extra training data | 0.5655 | no | DFL labels switch owner on every touch; the challenge only changes possession on control |
 | 14 | DFL with labels smoothed (owner runs < 2 s merged) | 0.5632 | no | still a definition mismatch |
-| 15 | **Bidirectional GRU blended with the trees** (weight 0.67, trained on GPU) | **0.6759** (chal 0.629 · raw 0.745 · sim 0.653) | **yes: current final** | +0.069 overall, +0.059 on chal; wins in all 9 held-out runs |
+| 15 | **Bidirectional GRU blended with the trees** (1 network, 64 units, weight 0.67, trained on GPU) | **0.6759** (chal 0.629 · raw 0.745 · sim 0.653) | superseded by 17 | +0.069 overall, +0.059 on chal; wins in all 9 held-out runs |
+| 16 | GRU ensemble: 5 networks (64 units, 10 epochs), finer blend-weight grid | 0.6876 (chal 0.636 · raw 0.758 · sim 0.669) | superseded by 17 | +0.012 over one GRU |
+| 17 | **GRU ensemble: 5 networks, 128 units, 15 epochs** | **0.6926** (chal 0.648 · raw 0.752 · sim 0.678) | **yes: current final** | +0.017 over one GRU; best on the challenge-like masks and on macroF1 |
 
-**Net achievement: 0.5707 → 0.6759 OOF (+0.105), and 0.522 → 0.629 on the challenge-like masks
-(+0.107).** For comparison, the nearest-player baseline idea scores 0.258 on the same masked games.
+**Net achievement: 0.5707 → 0.6926 OOF (+0.122), and 0.522 → 0.648 on the challenge-like masks
+(+0.126).** For comparison, the nearest-player baseline idea scores 0.258 on the same masked games.
 Reports for every run are in `reports/<run name>/`, including `oof_layers_summary.csv` per mask,
-`decoder_tuning_*.csv` and, for the GRU run, `gru_weight_search.csv`.
+`decoder_tuning_*.csv` and, for the GRU runs, `gru_weight_search.csv`. The final run is
+`reports/gru5_big/`. The single-GRU run is `reports/gru/` and the 64-unit ensemble `reports/gru5/`.
 
-### Final run in full (`reports/gru/`)
+### Final run in full (`reports/gru5_big/`)
 
 Mean over all 3 held-out games × 3 masks:
 
@@ -267,58 +282,60 @@ Mean over all 3 held-out games × 3 masks:
 |---|---|---|---|
 | 1 | nearest-player baseline (w=50) | 0.2584 | 0.5433 |
 | 2 | rule engine alone (teammate) | 0.2247 | 0.4872 |
-| 3 | models, argmax (no decoder) | 0.4378 | 0.8530 |
-| 4 | models + default decoder | 0.6053 | 0.8512 |
-| 5 | models + Smart Tagging + tuned decoder | 0.6759 | 0.8638 |
+| 3 | models, argmax (no decoder) | 0.5450 | 0.8596 |
+| 4 | models + default decoder | 0.6288 | 0.8587 |
+| 5 | models + Smart Tagging + tuned decoder | 0.6926 | 0.8706 |
 | 5c | trees only (GRU weight 0) | 0.6074 | 0.8490 |
-| 6 | models + stacker + Smart Tagging + tuned decoder | 0.5964 | 0.8480 |
-| 6b | selected, but turnover detector off | 0.6420 | 0.8609 |
-| **7** | **selected pipeline** | **0.6759** | **0.8638** |
-| 8 | oracle: selected + perfect dead/live | 0.7105 | 0.9258 |
-| 9 | oracle: selected + perfect team | 0.8806 | 0.9000 |
+| 6 | models + stacker + Smart Tagging + tuned decoder | 0.5622 | 0.8505 |
+| 6b | selected, but turnover detector off | 0.6586 | 0.8678 |
+| **7** | **selected pipeline** | **0.6926** | **0.8706** |
+| 8 | oracle: selected + perfect dead/live | 0.7313 | 0.9310 |
+| 9 | oracle: selected + perfect team | 0.8914 | 0.9043 |
 
-GRU blend-weight search (`gru_weight_search.csv`; the decoder is re-tuned for each weight):
+GRU blend-weight searches (`gru_weight_search.csv`; the decoder is re-tuned for each weight):
 
-| GRU weight | 0 (trees only) | 0.33 | **0.67** | 1.0 (GRU only) |
-|---|---|---|---|---|
-| spellF1 | 0.6040 | 0.6455 | **0.6755** | 0.6716 |
-| macroF1 | 0.8487 | 0.8594 | **0.8633** | 0.8538 |
+| GRU weight | 0 (trees only) | 0.33 | 0.5 | 0.67 | 0.8 | 0.9 | 1.0 (GRU only) |
+|---|---|---|---|---|---|---|---|
+| 1 GRU, 64 units (`reports/gru`) | 0.6040 | 0.6455 | — | **0.6755** | — | — | 0.6716 |
+| 5 GRUs, 64 units (`reports/gru5`) | 0.6040 | — | 0.6679 | 0.6798 | 0.6842 | **0.6859** | 0.6829 |
+| **5 GRUs, 128 units, 15 ep** (`reports/gru5_big`) | 0.6040 | — | 0.6837 | 0.6927 | **0.6968** | 0.6966 | 0.6955 |
 
-Every held-out run, trees only vs trees + GRU (spellF1):
+Every held-out run, spellF1: trees only → one GRU → final ensemble:
 
 | Game | chal | raw | sim |
 |---|---|---|---|
-| Sample_Game_1 | 0.592 → **0.640** | 0.688 → **0.772** | 0.604 → **0.662** |
-| Sample_Game_2 | 0.574 → **0.614** | 0.676 → **0.743** | 0.585 → **0.647** |
-| Sample_Game_3 | 0.546 → **0.634** | 0.631 → **0.721** | 0.573 → **0.651** |
+| Sample_Game_1 | 0.592 → 0.640 → **0.649** | 0.688 → 0.772 → **0.779** | 0.604 → 0.662 → **0.711** |
+| Sample_Game_2 | 0.574 → 0.614 → **0.637** | 0.676 → 0.743 → **0.760** | 0.585 → 0.647 → **0.672** |
+| Sample_Game_3 | 0.546 → 0.634 → **0.657** | 0.631 → 0.721 → **0.718** | 0.573 → 0.651 → **0.651** |
 
-Two things worth noticing in the final table. Row 3 jumped from about 0.19 to 0.44: the GRU's
-per-frame output is already much less flickery than the trees'. And the turnover detector still
-adds +0.034 on top of the GRU (row 6b vs row 7).
+Things worth noticing. Row 3 jumped from about 0.19 (trees only) to 0.55: the GRUs' per-frame output
+is already much less flickery than the trees'. And the turnover detector still adds +0.034 on top
+of the GRUs (row 6b vs row 7).
 
 Other things established along the way:
 
 - **The tree models retrain deterministically.** The same command gave byte-identical tree models
   twice, and the turnover run gave the identical table twice. The GRU is reproducible from its
   committed weights. Retrained on another machine or GPU, its weights will differ slightly.
-- **Prediction is deterministic:** `predict` from the committed models runs on CPU and printed
-  SHA-256 `f78df2627a0794535ac4925f03e5a16ef3ec687c9d5d59e39241b73f38546339`.
+- **Prediction is deterministic:** `predict` from the committed models runs on CPU, and two runs
+  printed the same SHA-256, `5bbb327135ae54ec2557a012b047cc176d4b0dc16b4f69c38eaa8475c961f840`.
 - **The broadcast video was used** (layer 1) to fill missing tactical ball positions.
 - **The raw ATD has no hidden possession or alive channel.** The ball field is just `x,y,speed`.
-- **Public 5-minute sanity check:** the *original* pipeline scored spellF1 0.4387 there (14
-  possessions vs 17 true). That is an alignment check only. It is never used to pick a version, and
-  one possession moves it by about 6 points.
+- **Public 5-minute sanity check:** the *original* pipeline scored spellF1 0.4387 there, and the
+  single-GRU pipeline 0.5935 (14 possessions vs 17 true, transitions about 12 frames early on
+  average). That is an alignment check only. It is never used to pick a version, and one possession
+  moves it by about 6 points.
 
 ## 8. What to expect, and limitations
 
-- The private score will most likely be **below** our OOF number of 0.676. The challenge tracking
+- The private score will most likely be **below** our OOF number of 0.693. The challenge tracking
   is noisier than our simulated masks, and Smart Tagging on the external games is simulated by our
   own code. Earlier, the original pipeline scored about 0.57 OOF but 0.44 on the public 5 minutes.
   If a similar drop applies, expect something like 0.5–0.6 on the full match, against the 0.2433
   baseline. That is an estimate, not a measurement. **0.7 on the private match is possible but
   unlikely.**
-- **Turnovers are still the bottleneck** (oracle row 9: 0.88 vs 0.68). Fixing dead/live boundaries
-  perfectly would add only about +0.035.
+- **Turnovers are still the bottleneck** (oracle row 9: 0.89 vs 0.69). Fixing dead/live boundaries
+  perfectly would add only about +0.04.
 - **Only 3 labelled games.** That limits every learned part. The stacker overfit; the GRU didn't,
   but a sequence model can also learn quirks of the Metrica games that don't carry over.
 - **GRU retraining is not bit-exact across machines.** The submission is reproducible from the
@@ -328,9 +345,9 @@ Other things established along the way:
 
 Ideas not tried yet, roughly by expected value:
 
-1. **Push the GRU further**, since it gave the biggest gain: average several GRUs trained with
-   different seeds, try 64 → 128 units or 2 layers, more epochs, and blend weights between 0.67 and 1.
-   Each is judged by row 7, as always.
+1. **Push the GRU a little further:** 10 networks instead of 5, longer training chunks (512 steps,
+   ~82 s), or 2 layers. These are single flags or small changes. Expected gains are now small
+   (+0.005 to +0.01), so returns are diminishing. Each is judged by row 7, as always.
 2. **Our own ball detector on the tactical video** (allowed by the rules) to cut the 41% missing
    ball. Highest potential, but a big job.
 3. More turnover-specific features: pass-target inference, a pressing measure on the ball carrier.

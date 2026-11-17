@@ -1,0 +1,34 @@
+mode,method,spell_f1,macro_f1,n_pred,n_gt
+chal,1. nearest-player baseline (w=50),0.2256,0.4536,466.0,310.0
+chal,2. rule engine alone (teammate),0.2112,0.4778,466.6667,310.0
+chal,"3. models, argmax",0.5181,0.8283,358.3333,310.0
+chal,4. models + default decoder,0.5651,0.8268,190.6667,310.0
+chal,5. models + Smart Tagging + tuned decoder,0.6359,0.8433,228.6667,310.0
+chal,5c. trees only (GRU weight 0),0.5704,0.8312,228.0,310.0
+chal,6. models + STACKER + Smart Tagging + tuned decoder,0.5576,0.8287,252.0,310.0
+chal,6b. SELECTED but turnover detector off (sw_beta=0),0.6091,0.8406,210.0,310.0
+chal,7. SELECTED pipeline,0.6359,0.8433,228.6667,310.0
+chal,8. oracle: selected + perfect dead/live,0.6739,0.9128,209.0,310.0
+chal,9. oracle: selected + perfect team,0.8514,0.883,325.3333,310.0
+raw,1. nearest-player baseline (w=50),0.353,0.7501,592.6667,310.0
+raw,2. rule engine alone (teammate),0.2521,0.479,600.3333,310.0
+raw,"3. models, argmax",0.6307,0.8792,383.3333,310.0
+raw,4. models + default decoder,0.6727,0.8776,214.3333,310.0
+raw,5. models + Smart Tagging + tuned decoder,0.7576,0.8885,268.6667,310.0
+raw,5c. trees only (GRU weight 0),0.6649,0.869,252.3333,310.0
+raw,6. models + STACKER + Smart Tagging + tuned decoder,0.6501,0.8695,291.6667,310.0
+raw,6b. SELECTED but turnover detector off (sw_beta=0),0.7166,0.8851,234.6667,310.0
+raw,7. SELECTED pipeline,0.7576,0.8885,268.6667,310.0
+raw,8. oracle: selected + perfect dead/live,0.781,0.9411,249.6667,310.0
+raw,9. oracle: selected + perfect team,0.9044,0.9132,330.3333,310.0
+sim,1. nearest-player baseline (w=50),0.1965,0.4263,712.0,310.0
+sim,2. rule engine alone (teammate),0.2108,0.5047,573.0,310.0
+sim,"3. models, argmax",0.5587,0.8543,346.0,310.0
+sim,4. models + default decoder,0.621,0.8526,201.0,310.0
+sim,5. models + Smart Tagging + tuned decoder,0.6693,0.865,238.0,310.0
+sim,5c. trees only (GRU weight 0),0.5869,0.8468,240.3333,310.0
+sim,6. models + STACKER + Smart Tagging + tuned decoder,0.5764,0.846,266.3333,310.0
+sim,6b. SELECTED but turnover detector off (sw_beta=0),0.6512,0.863,215.0,310.0
+sim,7. SELECTED pipeline,0.6693,0.865,238.0,310.0
+sim,8. oracle: selected + perfect dead/live,0.6952,0.9255,220.3333,310.0
+sim,9. oracle: selected + perfect team,0.8744,0.8997,324.6667,310.0

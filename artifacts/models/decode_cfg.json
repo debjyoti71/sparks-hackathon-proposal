@@ -1,8 +1,8 @@
 {
-  "c_ha": 20.0,
-  "c_ld": 25.0,
+  "c_ha": 40.0,
+  "c_ld": 50.0,
   "min_poss_s": 0.0,
   "min_dead_s": 0.0,
   "stride": 1,
-  "sw_beta": 3.0
+  "sw_beta": 6.0
 }

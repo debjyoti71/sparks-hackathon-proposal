@@ -1,0 +1,12 @@
+method,spell_f1,macro_f1
+1. nearest-player baseline (w=50),0.2584,0.5433
+2. rule engine alone (teammate),0.2247,0.4872
+"3. models, argmax",0.545,0.8596
+4. models + default decoder,0.6288,0.8587
+5. models + Smart Tagging + tuned decoder,0.6926,0.8706
+5c. trees only (GRU weight 0),0.6074,0.849
+6. models + STACKER + Smart Tagging + tuned decoder,0.5622,0.8505
+6b. SELECTED but turnover detector off (sw_beta=0),0.6586,0.8678
+7. SELECTED pipeline,0.6926,0.8706
+8. oracle: selected + perfect dead/live,0.7313,0.931
+9. oracle: selected + perfect team,0.8914,0.9043

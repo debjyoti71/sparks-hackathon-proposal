@@ -1,0 +1,100 @@
+game,mode,method,spell_f1,macro_f1,n_gt,n_pred
+Sample_Game_1,sim,1. nearest-player baseline (w=50),0.1838,0.4025,295,678
+Sample_Game_1,sim,2. rule engine alone (teammate),0.1865,0.4724,295,591
+Sample_Game_1,sim,"3. models, argmax",0.571,0.8392,295,353
+Sample_Game_1,sim,4. models + default decoder,0.6427,0.8395,295,201
+Sample_Game_1,sim,5. models + Smart Tagging + tuned decoder,0.6955,0.851,295,237
+Sample_Game_1,sim,6. models + STACKER + Smart Tagging + tuned decoder,0.6004,0.8425,295,258
+Sample_Game_1,sim,6b. SELECTED but turnover detector off (sw_beta=0),0.6703,0.8484,295,214
+Sample_Game_1,sim,7. SELECTED pipeline,0.6955,0.851,295,237
+Sample_Game_1,sim,8. oracle: selected + perfect dead/live,0.7233,0.9313,295,211
+Sample_Game_1,sim,9. oracle: selected + perfect team,0.8562,0.8845,295,324
+Sample_Game_1,sim,5c. trees only (GRU weight 0),0.6038,0.8416,295,235
+Sample_Game_1,raw,1. nearest-player baseline (w=50),0.3641,0.7151,295,552
+Sample_Game_1,raw,2. rule engine alone (teammate),0.2388,0.4384,295,596
+Sample_Game_1,raw,"3. models, argmax",0.6559,0.8661,295,374
+Sample_Game_1,raw,4. models + default decoder,0.6585,0.8652,295,211
+Sample_Game_1,raw,5. models + Smart Tagging + tuned decoder,0.7888,0.8787,295,275
+Sample_Game_1,raw,6. models + STACKER + Smart Tagging + tuned decoder,0.6725,0.8653,295,298
+Sample_Game_1,raw,6b. SELECTED but turnover detector off (sw_beta=0),0.7263,0.874,295,237
+Sample_Game_1,raw,7. SELECTED pipeline,0.7888,0.8787,295,275
+Sample_Game_1,raw,8. oracle: selected + perfect dead/live,0.8237,0.9498,295,246
+Sample_Game_1,raw,9. oracle: selected + perfect team,0.896,0.9009,295,334
+Sample_Game_1,raw,5c. trees only (GRU weight 0),0.688,0.8632,295,255
+Sample_Game_1,chal,1. nearest-player baseline (w=50),0.2155,0.4392,295,468
+Sample_Game_1,chal,2. rule engine alone (teammate),0.1992,0.447,295,462
+Sample_Game_1,chal,"3. models, argmax",0.503,0.8155,295,373
+Sample_Game_1,chal,4. models + default decoder,0.5568,0.8149,295,187
+Sample_Game_1,chal,5. models + Smart Tagging + tuned decoder,0.6516,0.8269,295,228
+Sample_Game_1,chal,6. models + STACKER + Smart Tagging + tuned decoder,0.5785,0.8266,295,245
+Sample_Game_1,chal,6b. SELECTED but turnover detector off (sw_beta=0),0.6036,0.823,295,206
+Sample_Game_1,chal,7. SELECTED pipeline,0.6516,0.8269,295,228
+Sample_Game_1,chal,8. oracle: selected + perfect dead/live,0.6925,0.9144,295,196
+Sample_Game_1,chal,9. oracle: selected + perfect team,0.8427,0.8677,295,314
+Sample_Game_1,chal,5c. trees only (GRU weight 0),0.5919,0.8293,295,222
+Sample_Game_2,sim,1. nearest-player baseline (w=50),0.1942,0.4168,287,679
+Sample_Game_2,sim,2. rule engine alone (teammate),0.2333,0.5043,287,543
+Sample_Game_2,sim,"3. models, argmax",0.5457,0.856,287,328
+Sample_Game_2,sim,4. models + default decoder,0.6221,0.8511,287,183
+Sample_Game_2,sim,5. models + Smart Tagging + tuned decoder,0.6571,0.8606,287,214
+Sample_Game_2,sim,6. models + STACKER + Smart Tagging + tuned decoder,0.5673,0.8358,287,258
+Sample_Game_2,sim,6b. SELECTED but turnover detector off (sw_beta=0),0.6455,0.8598,287,197
+Sample_Game_2,sim,7. SELECTED pipeline,0.6571,0.8606,287,214
+Sample_Game_2,sim,8. oracle: selected + perfect dead/live,0.68,0.9112,287,203
+Sample_Game_2,sim,9. oracle: selected + perfect team,0.8806,0.8946,287,289
+Sample_Game_2,sim,5c. trees only (GRU weight 0),0.5845,0.8372,287,229
+Sample_Game_2,raw,1. nearest-player baseline (w=50),0.3827,0.7636,287,520
+Sample_Game_2,raw,2. rule engine alone (teammate),0.2674,0.4704,287,576
+Sample_Game_2,raw,"3. models, argmax",0.626,0.8801,287,359
+Sample_Game_2,raw,4. models + default decoder,0.6992,0.8772,287,201
+Sample_Game_2,raw,5. models + Smart Tagging + tuned decoder,0.7495,0.8838,287,244
+Sample_Game_2,raw,6. models + STACKER + Smart Tagging + tuned decoder,0.6484,0.8639,287,275
+Sample_Game_2,raw,6b. SELECTED but turnover detector off (sw_beta=0),0.724,0.8818,287,218
+Sample_Game_2,raw,7. SELECTED pipeline,0.7495,0.8838,287,244
+Sample_Game_2,raw,8. oracle: selected + perfect dead/live,0.7655,0.928,287,234
+Sample_Game_2,raw,9. oracle: selected + perfect team,0.9139,0.9083,287,289
+Sample_Game_2,raw,5c. trees only (GRU weight 0),0.6756,0.865,287,237
+Sample_Game_2,chal,1. nearest-player baseline (w=50),0.2287,0.434,287,439
+Sample_Game_2,chal,2. rule engine alone (teammate),0.2128,0.4652,287,448
+Sample_Game_2,chal,"3. models, argmax",0.5411,0.8275,287,314
+Sample_Game_2,chal,4. models + default decoder,0.5873,0.8221,287,185
+Sample_Game_2,chal,5. models + Smart Tagging + tuned decoder,0.6236,0.8345,287,212
+Sample_Game_2,chal,6. models + STACKER + Smart Tagging + tuned decoder,0.5442,0.8094,287,251
+Sample_Game_2,chal,6b. SELECTED but turnover detector off (sw_beta=0),0.6079,0.8326,287,196
+Sample_Game_2,chal,7. SELECTED pipeline,0.6236,0.8345,287,212
+Sample_Game_2,chal,8. oracle: selected + perfect dead/live,0.6697,0.8944,287,201
+Sample_Game_2,chal,9. oracle: selected + perfect team,0.8416,0.8733,287,290
+Sample_Game_2,chal,5c. trees only (GRU weight 0),0.5735,0.8135,287,218
+Sample_Game_3,sim,1. nearest-player baseline (w=50),0.2115,0.4594,348,779
+Sample_Game_3,sim,2. rule engine alone (teammate),0.2126,0.5376,348,585
+Sample_Game_3,sim,"3. models, argmax",0.5594,0.8677,348,357
+Sample_Game_3,sim,4. models + default decoder,0.5982,0.8671,348,219
+Sample_Game_3,sim,5. models + Smart Tagging + tuned decoder,0.6553,0.8834,348,263
+Sample_Game_3,sim,6. models + STACKER + Smart Tagging + tuned decoder,0.5616,0.8598,348,283
+Sample_Game_3,sim,6b. SELECTED but turnover detector off (sw_beta=0),0.6378,0.8807,348,234
+Sample_Game_3,sim,7. SELECTED pipeline,0.6553,0.8834,348,263
+Sample_Game_3,sim,8. oracle: selected + perfect dead/live,0.6824,0.9341,348,247
+Sample_Game_3,sim,9. oracle: selected + perfect team,0.8863,0.9201,348,361
+Sample_Game_3,sim,5c. trees only (GRU weight 0),0.5726,0.8616,348,257
+Sample_Game_3,raw,1. nearest-player baseline (w=50),0.3123,0.7717,348,706
+Sample_Game_3,raw,2. rule engine alone (teammate),0.2502,0.5283,348,629
+Sample_Game_3,raw,"3. models, argmax",0.6102,0.8915,348,417
+Sample_Game_3,raw,4. models + default decoder,0.6604,0.8904,348,231
+Sample_Game_3,raw,5. models + Smart Tagging + tuned decoder,0.7345,0.9031,348,287
+Sample_Game_3,raw,6. models + STACKER + Smart Tagging + tuned decoder,0.6295,0.8792,348,302
+Sample_Game_3,raw,6b. SELECTED but turnover detector off (sw_beta=0),0.6995,0.8996,348,249
+Sample_Game_3,raw,7. SELECTED pipeline,0.7345,0.9031,348,287
+Sample_Game_3,raw,8. oracle: selected + perfect dead/live,0.754,0.9454,348,269
+Sample_Game_3,raw,9. oracle: selected + perfect team,0.9034,0.9304,348,368
+Sample_Game_3,raw,5c. trees only (GRU weight 0),0.631,0.8788,348,265
+Sample_Game_3,chal,1. nearest-player baseline (w=50),0.2327,0.4876,348,491
+Sample_Game_3,chal,2. rule engine alone (teammate),0.2215,0.5211,348,490
+Sample_Game_3,chal,"3. models, argmax",0.5103,0.842,348,388
+Sample_Game_3,chal,4. models + default decoder,0.5511,0.8434,348,200
+Sample_Game_3,chal,5. models + Smart Tagging + tuned decoder,0.6323,0.8685,348,246
+Sample_Game_3,chal,6. models + STACKER + Smart Tagging + tuned decoder,0.55,0.8502,348,260
+Sample_Game_3,chal,6b. SELECTED but turnover detector off (sw_beta=0),0.616,0.8661,348,228
+Sample_Game_3,chal,7. SELECTED pipeline,0.6323,0.8685,348,246
+Sample_Game_3,chal,8. oracle: selected + perfect dead/live,0.6595,0.9297,348,230
+Sample_Game_3,chal,9. oracle: selected + perfect team,0.87,0.908,348,372
+Sample_Game_3,chal,5c. trees only (GRU weight 0),0.5459,0.8509,348,244

@@ -42,7 +42,7 @@ SMART_TAG_SEED = 42             # seed for simulated Smart Tagging on the extern
 GRID_LD = (6, 12, 25, 50, 100)  # live<->dead switching-cost grid
 GRID_HA = (2, 3, 5, 10, 20, 40)  # H<->A switching-cost grid
 DFL_STRIDE = 8                  # extra DFL games: keep every 8th frame (7 games, limits memory)
-GRID_GRU_W = (0.0, 0.33, 0.67, 1.0)  # GRU blend weight (0 = trees only, 1 = GRU only), chosen out-of-fold
+GRID_GRU_W = (0.0, 0.5, 0.67, 0.8, 0.9, 1.0)  # GRU blend weight (0 = trees only, 1 = GRU only), chosen out-of-fold
 GRID_SW = (0.0, 1.0, 2.0, 3.0, 4.0, 6.0, 8.0)  # turnover-detector weight in the decoder; 0 = detector ignored
 # Rule-engine prior weights (teammate's engine). Rejected out-of-fold; searched only with --rule-search.
 GRID_W_TEAM = (0.0, 0.5, 1.0, 2.0)
@@ -87,8 +87,8 @@ def _oracles(gt, pred, p_home):
 # --------------------------------------------------------------------------------------- train
 
 def train(models_dir, reports_dir, threads=0, variant="dir_chal", search_rules=False, use_stack="off",
-          n_rounds=N_ROUNDS, dfl=False, dfl_smooth=0.0, gru=True, gru_epochs=10, torch_threads=4,
-          gru_device="cpu"):
+          n_rounds=N_ROUNDS, dfl=False, dfl_smooth=0.0, gru=True, gru_epochs=15, torch_threads=4,
+          gru_device="cpu", gru_seeds=5, gru_hidden=128, gru_layers=1):
     from possession.data import load_external_games
     from possession.decode import DecodeConfig, decode_match, nearest_player_baseline, score, tune_decoder
     from possession.features import DEFAULT_FCFG, DIR_FCFG, LONG_FCFG
@@ -144,7 +144,8 @@ def train(models_dir, reports_dir, threads=0, variant="dir_chal", search_rules=F
         if gru:
             from possession.gru import GRUConfig, GRUModel
             log("  training GRU for held-out {}".format(g.name))
-            g_model = GRUModel.fit(tr, GRUConfig(epochs=gru_epochs, threads=torch_threads, device=gru_device), log=log)
+            g_model = GRUModel.fit(tr, GRUConfig(epochs=gru_epochs, threads=torch_threads, device=gru_device, seeds=gru_seeds,
+                          hidden=gru_hidden, layers=gru_layers), log=log)
 
         # Stacker for this fold: trained on stage-1 predictions for the two training games, each
         # produced by a model fitted on the OTHER training game only -- the held-out game is never seen.
@@ -301,7 +302,8 @@ def train(models_dir, reports_dir, threads=0, variant="dir_chal", search_rules=F
         from possession.gru import GRUConfig, GRUModel
         log("fitting final GRU on all three external games")
         GRUModel.fit([bd for g in games for bd in train_bundles[g.name]] + extra,
-                     GRUConfig(epochs=gru_epochs, threads=torch_threads, device=gru_device), log=log).save(models_dir)
+                     GRUConfig(epochs=gru_epochs, threads=torch_threads, device=gru_device, seeds=gru_seeds,
+                          hidden=gru_hidden, layers=gru_layers), log=log).save(models_dir)
     if stack_on:
         log("fitting final stacker on all out-of-fold stage-1 predictions")
         Stacker.fit([dict(p_dead=o["p_dead"], p_home=o["p_home"], period=o["period"], aux=o["aux"],
@@ -418,7 +420,10 @@ def main():
                     help="train: skip the bidirectional GRU (by default it is trained and blended in if it wins out-of-fold)")
     ap.add_argument("--gru-device", default="cpu", choices=["cpu", "cuda"],
                     help="train: device for GRU training (prediction always runs on CPU)")
-    ap.add_argument("--gru-epochs", type=int, default=10, help="train: GRU epochs")
+    ap.add_argument("--gru-seeds", type=int, default=5, help="train: GRU ensemble size (networks averaged)")
+    ap.add_argument("--gru-hidden", type=int, default=128, help="train: GRU units per direction")
+    ap.add_argument("--gru-layers", type=int, default=1, help="train: stacked GRU layers")
+    ap.add_argument("--gru-epochs", type=int, default=15, help="train: GRU epochs")
     ap.add_argument("--torch-threads", type=int, default=4, help="train: CPU threads for the GRU (fixed for determinism; saved with the model)")
     ap.add_argument("--rounds", type=int, default=N_ROUNDS, help="train: LightGBM boosting rounds per model")
     ap.add_argument("--threads", type=int, default=0, help="LightGBM threads for train (0 = all cores)")
@@ -429,7 +434,8 @@ def main():
         train(args.models, args.reports, threads=args.threads, variant=args.variant,
               search_rules=args.rule_search, use_stack=args.stack, n_rounds=args.rounds, dfl=args.dfl, dfl_smooth=args.dfl_smooth,
               gru=args.gru, gru_epochs=args.gru_epochs, torch_threads=args.torch_threads,
-              gru_device=args.gru_device)
+              gru_device=args.gru_device, gru_seeds=args.gru_seeds, gru_hidden=args.gru_hidden,
+              gru_layers=args.gru_layers)
     if args.command in ("predict", "all"):
         predict(args.team, args.models, data_dir=args.data_dir, use_cache=not args.no_cache,
                 compare=args.compare)

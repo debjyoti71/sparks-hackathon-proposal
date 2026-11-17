@@ -37,6 +37,7 @@ class GRUConfig:
     seed: int = 0
     threads: int = 4
     device: str = "cpu"        # "cuda" speeds up TRAINING only; inference after load() is always CPU
+    seeds: int = 1             # ensemble size: networks trained with seeds seed, seed+1, ... and averaged
 
 
 def _logit(p):
@@ -104,9 +105,58 @@ def _setup_torch(cfg):
     return torch
 
 
+def _train_one(seqs, n_in, cfg, seed, log):
+    """Train one network with its own seed (seed == cfg.seed reproduces the single-GRU model)."""
+    import torch
+    torch.manual_seed(seed)
+    if cfg.device.startswith("cuda"):
+        torch.cuda.manual_seed_all(seed)
+    rng = np.random.default_rng(seed)
+    dev = torch.device(cfg.device)
+    net = _build_net(n_in, cfg).to(dev)
+    log("    GRU (seed {}) training on {}".format(seed, dev))
+    opt = torch.optim.AdamW(net.parameters(), lr=cfg.lr, weight_decay=cfg.weight_decay)
+    bce = torch.nn.BCEWithLogitsLoss(reduction="none")
+    L = cfg.chunk
+    for epoch in range(cfg.epochs):
+        items = []
+        for si, s in enumerate(seqs):
+            n = len(s[0])
+            if n < L:
+                continue
+            off = int(rng.integers(0, L))
+            items += [(si, st) for st in range(off, n - L + 1, L)]
+        order = rng.permutation(len(items))
+        net.train()
+        total, nb = 0.0, 0
+        for k in range(0, len(order), cfg.batch):
+            batch = [items[i] for i in order[k:k + cfg.batch]]
+            arrs = [np.stack([seqs[si][j][st:st + L] for si, st in batch]) for j in range(6)]
+            x, yd, md, yo, mo, ys = (torch.tensor(a, device=dev) for a in arrs)
+            out = net(x)
+            l_dead = (bce(out[..., 0], yd) * md).sum() / md.sum().clamp(min=1.0)
+            l_own = (bce(out[..., 1], yo) * mo).sum() / mo.sum().clamp(min=1.0)
+            l_sw = (bce(out[..., 2], ys) * md).sum() / md.sum().clamp(min=1.0)
+            loss = l_dead + l_own + l_sw
+            opt.zero_grad()
+            loss.backward()
+            torch.nn.utils.clip_grad_norm_(net.parameters(), 1.0)
+            opt.step()
+            total += float(loss.detach().cpu())
+            nb += 1
+        log("    GRU (seed {}) epoch {}/{}: loss {:.4f}".format(seed, epoch + 1, cfg.epochs, total / max(nb, 1)))
+    net.eval()
+    return net
+
+
 class GRUModel:
-    def __init__(self, net=None, mu=None, sd=None, cfg=None, n_in=None):
-        self.net, self.mu, self.sd, self.cfg, self.n_in = net, mu, sd, cfg or GRUConfig(), n_in
+    def __init__(self, net=None, mu=None, sd=None, cfg=None, n_in=None, nets=None):
+        self.mu, self.sd, self.cfg, self.n_in = mu, sd, cfg or GRUConfig(), n_in
+        self.nets = nets if nets is not None else ([net] if net is not None else [])
+
+    @property
+    def net(self):
+        return self.nets[0] if self.nets else None
 
     # -- features --------------------------------------------------------------------------
     def _z(self, x):
@@ -117,8 +167,7 @@ class GRUModel:
     @classmethod
     def fit(cls, bundles, cfg=None, log=print):
         cfg = cfg or GRUConfig()
-        torch = _setup_torch(cfg)
-        rng = np.random.default_rng(cfg.seed)
+        _setup_torch(cfg)
 
         sample = np.vstack([np.hstack([b.Xc, b.Xo01])[b.codes != X] for b in bundles])
         with np.errstate(all="ignore"):
@@ -142,41 +191,7 @@ class GRUModel:
                     seqs.append((z, (codes == D).astype(np.float32), graded,
                                  (codes == own).astype(np.float32), live, sw))
 
-        dev = torch.device(cfg.device)
-        net = _build_net(model.n_in, cfg).to(dev)
-        log("    GRU training on {}".format(dev))
-        opt = torch.optim.AdamW(net.parameters(), lr=cfg.lr, weight_decay=cfg.weight_decay)
-        bce = torch.nn.BCEWithLogitsLoss(reduction="none")
-        L = cfg.chunk
-        for epoch in range(cfg.epochs):
-            items = []
-            for si, s in enumerate(seqs):
-                n = len(s[0])
-                if n < L:
-                    continue
-                off = int(rng.integers(0, L))
-                items += [(si, st) for st in range(off, n - L + 1, L)]
-            order = rng.permutation(len(items))
-            net.train()
-            total, nb = 0.0, 0
-            for k in range(0, len(order), cfg.batch):
-                batch = [items[i] for i in order[k:k + cfg.batch]]
-                arrs = [np.stack([seqs[si][j][st:st + L] for si, st in batch]) for j in range(6)]
-                x, yd, md, yo, mo, ys = (torch.tensor(a, device=dev) for a in arrs)
-                out = net(x)
-                l_dead = (bce(out[..., 0], yd) * md).sum() / md.sum().clamp(min=1.0)
-                l_own = (bce(out[..., 1], yo) * mo).sum() / mo.sum().clamp(min=1.0)
-                l_sw = (bce(out[..., 2], ys) * md).sum() / md.sum().clamp(min=1.0)
-                loss = l_dead + l_own + l_sw
-                opt.zero_grad()
-                loss.backward()
-                torch.nn.utils.clip_grad_norm_(net.parameters(), 1.0)
-                opt.step()
-                total += float(loss.detach().cpu())
-                nb += 1
-            log("    GRU epoch {}/{}: loss {:.4f}".format(epoch + 1, cfg.epochs, total / max(nb, 1)))
-        net.eval()
-        model.net = net
+        model.nets = [_train_one(seqs, model.n_in, cfg, cfg.seed + k, log) for k in range(max(cfg.seeds, 1))]
         return model
 
     # -- inference -------------------------------------------------------------------------
@@ -188,15 +203,19 @@ class GRUModel:
         T = len(b.period)
         out = {k: np.full(T, np.nan) for k in ("dead", "home", "switch")}
         for rows in _segments(b.period, step):
-            logits = []
-            for xo in (b.Xo01, b.Xo10):
-                z = self._z(np.hstack([b.Xc[rows], xo[rows]]))
-                with torch.no_grad():
-                    logits.append(self.net(torch.tensor(z, device=dev)[None])[0].cpu().numpy().astype(np.float64))
+            zs = [self._z(np.hstack([b.Xc[rows], xo[rows]])) for xo in (b.Xo01, b.Xo10)]
+            d = h = s = 0.0
+            for net in self.nets:                       # ensemble: average the probabilities
+                logits = []
+                for z in zs:
+                    with torch.no_grad():
+                        logits.append(net(torch.tensor(z, device=dev)[None])[0].cpu().numpy().astype(np.float64))
+                d = d + 0.5 * (_sigmoid(logits[0][:, 0]) + _sigmoid(logits[1][:, 0]))
+                h = h + 0.5 * (_sigmoid(logits[0][:, 1]) + 1.0 - _sigmoid(logits[1][:, 1]))
+                s = s + 0.5 * (_sigmoid(logits[0][:, 2]) + _sigmoid(logits[1][:, 2]))
+            k = float(len(self.nets))
+            d, h, s = d / k, h / k, s / k
             full = np.arange(rows[0], rows[-1] + 1)
-            d = 0.5 * (_sigmoid(logits[0][:, 0]) + _sigmoid(logits[1][:, 0]))
-            h = 0.5 * (_sigmoid(logits[0][:, 1]) + 1.0 - _sigmoid(logits[1][:, 1]))
-            s = 0.5 * (_sigmoid(logits[0][:, 2]) + _sigmoid(logits[1][:, 2]))
             for key, val in (("dead", d), ("home", h), ("switch", s)):
                 out[key][full] = _sigmoid(np.interp(full, rows, _logit(val)))
         return out["dead"], out["home"], out["switch"]
@@ -205,10 +224,12 @@ class GRUModel:
     def save(self, folder):
         import torch
         os.makedirs(folder, exist_ok=True)
-        torch.save({k: v.detach().cpu() for k, v in self.net.state_dict().items()}, os.path.join(folder, "gru.pt"))
+        for i, net in enumerate(self.nets):             # gru.pt, gru_1.pt, gru_2.pt, ...
+            name = "gru.pt" if i == 0 else "gru_{}.pt".format(i)
+            torch.save({k: v.detach().cpu() for k, v in net.state_dict().items()}, os.path.join(folder, name))
         np.savez(os.path.join(folder, "gru_norm.npz"), mu=self.mu, sd=self.sd)
         with open(os.path.join(folder, "gru_cfg.json"), "w") as handle:
-            json.dump({"n_in": int(self.n_in), **asdict(self.cfg)}, handle, indent=2)
+            json.dump({"n_in": int(self.n_in), **asdict(self.cfg), "seeds": len(self.nets)}, handle, indent=2)
 
     @classmethod
     def load(cls, folder):
@@ -219,8 +240,12 @@ class GRUModel:
         raw["device"] = "cpu"        # the submission is always produced on CPU, on any machine
         cfg = GRUConfig(**raw)
         _setup_torch(cfg)
-        net = _build_net(n_in, cfg)
-        net.load_state_dict(torch.load(os.path.join(folder, "gru.pt"), map_location="cpu"))
-        net.eval()
+        nets = []
+        for i in range(max(cfg.seeds, 1)):
+            net = _build_net(n_in, cfg)
+            name = "gru.pt" if i == 0 else "gru_{}.pt".format(i)
+            net.load_state_dict(torch.load(os.path.join(folder, name), map_location="cpu"))
+            net.eval()
+            nets.append(net)
         z = np.load(os.path.join(folder, "gru_norm.npz"))
-        return cls(net, z["mu"], z["sd"], cfg, n_in)
+        return cls(None, z["mu"], z["sd"], cfg, n_in, nets=nets)
