@@ -171,8 +171,8 @@ def _pinpoint_kick_frame(match, ball_speed, player_mean_speed, obs, a, b, sp_typ
         if a <= 113742 <= b:
             return 113742
 
-    # Search inside the inner [20%, 92%] of the window where the strike occurs
-    s0 = a + int(0.18 * (b - a))
+    # Search from the start of the window up to 92% (do not skip the initial 18% of long windows)
+    s0 = a
     s1 = a + int(0.92 * (b - a))
     if s1 <= s0:
         s0, s1 = a, b
@@ -180,12 +180,12 @@ def _pinpoint_kick_frame(match, ball_speed, player_mean_speed, obs, a, b, sp_typ
     sub_bsp = np.nan_to_num(ball_speed[s0:s1], nan=0.0)
     sub_obs = obs[s0:s1]
 
-    # Look for the first visible ball frame that accelerates past 4.5 m/s
-    fast_visible = np.flatnonzero(sub_obs & (sub_bsp >= 4.5))
+    # Look for the first visible ball frame that accelerates past 3.5 m/s
+    fast_visible = np.flatnonzero(sub_obs & (sub_bsp >= 3.5))
     if len(fast_visible):
         k = int(fast_visible[0])
         # Walk back a couple of frames to the start of the acceleration impulse
-        while k > 0 and sub_obs[k - 1] and sub_bsp[k - 1] >= 2.0:
+        while k > 0 and sub_obs[k - 1] and sub_bsp[k - 1] >= 1.5:
             k -= 1
         return s0 + k
 
@@ -193,16 +193,17 @@ def _pinpoint_kick_frame(match, ball_speed, player_mean_speed, obs, a, b, sp_typ
     sub_psp = np.nan_to_num(player_mean_speed[s0:s1], nan=0.0)
     score = sub_bsp + 2.0 * np.gradient(sub_bsp) + 1.5 * sub_psp
     if len(score):
-        # Bias slightly toward ~65% of the window (3.5s into a 5.5s window)
-        prior = -0.5 * ((np.linspace(0, 1, len(score)) - 0.65) / 0.35) ** 2
+        # Bias slightly toward the middle of the window
+        prior = -0.5 * ((np.linspace(0, 1, len(score)) - 0.5) / 0.35) ** 2
         return s0 + int(np.argmax(score + prior))
-    return a + int(0.65 * (b - a))
+    return a + int(0.5 * (b - a))
 
 
 def apply_smart_tagging_priors(match, instances, p_dead, p_home,
                                phase_logit_weight=0.55,
                                restart_dead_boost=2.2,
-                               restart_live_boost=2.0):
+                               restart_live_boost=2.0,
+                               phase_dead_suppression=0.7):
     """Combine Smart Tagging set-piece anchors and tactical phase priors with model probabilities.
 
      operates in log-odds space so strong model certainties are respected while ambiguous /
@@ -266,14 +267,26 @@ def apply_smart_tagging_priors(match, instances, p_dead, p_home,
     weight_frame = np.where(obs, 0.35 * phase_logit_weight, 1.0 * phase_logit_weight)
     logit_home += weight_frame * avg_vote
 
+    # Suppress false dead ball during confirmed active tactical phases
+    if phase_dead_suppression > 0:
+        logit_dead[has_phase] -= phase_dead_suppression
+
+    # Active play guard: if in an active tactical phase and ball is observed moving inside pitch,
+    # the ball cannot be dead. Overrule stoppage inertia.
+    active_moving = has_phase & obs & (bsp >= 1.5)
+    logit_dead[active_moving] = np.minimum(logit_dead[active_moving], -1.0)
+
     # 2. Apply Set Piece restart anchors
     set_pieces.sort(key=lambda x: x[1])
     for a, kick, b, team, sp_type in set_pieces:
         # Pre-kick window: the stoppage leading up to `kick`
-        # Extend backward up to 8s before `a` if the ball was already missing or players were slow
+        # Extend backward up to 8s before `a` if the ball was already missing or players were slow,
+        # but stop if lookback touches an active tactical phase.
         pre_start = a
         lookback = max(0, a - 8 * fps)
         for t in range(a - 1, lookback - 1, -1):
+            if has_phase[t]:
+                break
             if not obs[t] or player_mean_sp[t] < 2.2:
                 pre_start = t
             else:
@@ -284,12 +297,14 @@ def apply_smart_tagging_priors(match, instances, p_dead, p_home,
         # Post-kick window: play just restarted at `kick`!
         live_end = min(T, max(b, kick + 2 * fps))
         if live_end > kick:
-            logit_dead[kick:live_end] -= restart_live_boost
+            boost_span = min(T, kick + 3 * fps)
+            logit_dead[kick:boost_span] = np.minimum(logit_dead[kick:boost_span], -1.2)
+            logit_dead[boost_span:live_end] -= restart_live_boost
             if team in (0, 1):
                 sign = 1.0 if team == 0 else -1.0
-                # Stronger team anchor for the first 2.5 seconds after a known-team set piece
-                team_end = min(T, kick + int(2.5 * fps))
-                logit_home[kick:team_end] += sign * 1.6
+                # Stronger team anchor for the first 3 seconds after a known-team set piece
+                team_end = min(T, kick + int(3.0 * fps))
+                logit_home[kick:team_end] += sign * 2.0
 
     # 3. Goals -> dead ball until the next Kick Off restart
     for ga, gb, _ in goals:
