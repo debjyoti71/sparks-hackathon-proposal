@@ -1,4 +1,9 @@
-"""Generate a 1-minute visual clip with players, ball, and updated hierarchical possession overlays."""
+"""Generate a 1-minute visual clip comparing:
+1. Ground Truth
+2. Shivain's 5-GRU Pipeline (debjyoti_team.csv)
+3. Your Hierarchical Rules Engine (hierarchical_possession_v1.csv)
+4. Original Nearest-Player Baseline (baseline_smooth50.csv)
+"""
 
 import os
 import sys
@@ -16,8 +21,11 @@ OUTPUT_VIDEO = "tracking_overlay_1min.mp4"
 VIDEO_PATH = "data/tactical/BAR-ATH_tactical-002.mp4"
 RAW_ATD_PATH = "data/tactical/BAR-ATH_tactical_atd.txt"
 META_ATD_PATH = "data/tactical/BAR-ATH_tactical_atd.xml"
+
+# CSV predictions
 GT_PATH = "evaluation/gt/BAR-ATH_possession_gt_public.csv"
-PRED_PATH = "evaluation/results/hierarchical_possession_v1.csv"
+SHIVAIN_PRED_PATH = "evaluation/results/debjyoti_team.csv"
+RULES_PRED_PATH = "evaluation/results/hierarchical_possession_v1.csv"
 BASELINE_PATH = "evaluation/results/baseline_smooth50.csv"
 
 # Colors (BGR)
@@ -49,7 +57,8 @@ def main():
 
     team_map = get_team_mapping(META_ATD_PATH)
     gt_df = pd.read_csv(GT_PATH)
-    pred_df = pd.read_csv(PRED_PATH)
+    shivain_df = pd.read_csv(SHIVAIN_PRED_PATH)
+    rules_df = pd.read_csv(RULES_PRED_PATH)
     base_df = pd.read_csv(BASELINE_PATH)
 
     # Read tracking records for the window
@@ -123,16 +132,17 @@ def main():
 
         # 3. Possession Info Overlay (Top-Right HUD)
         gt_label = gt_df.iloc[current_frame]["label"]
-        pred_label = pred_df.iloc[current_frame]["label"]
+        shivain_label = shivain_df.iloc[current_frame]["label"]
+        rules_label = rules_df.iloc[current_frame]["label"]
         base_label = base_df.iloc[current_frame]["label"]
 
         # HUD Box
-        hud_w, hud_h = 420, 165
+        hud_w, hud_h = 450, 195
         hud_x = width - hud_w - 30
         hud_y = 30
         overlay = frame.copy()
         cv2.rectangle(overlay, (hud_x, hud_y), (hud_x + hud_w, hud_y + hud_h), COLOR_BG, -1)
-        cv2.addWeighted(overlay, 0.8, frame, 0.2, 0, frame)
+        cv2.addWeighted(overlay, 0.82, frame, 0.18, 0, frame)
         cv2.rectangle(frame, (hud_x, hud_y), (hud_x + hud_w, hud_y + hud_h), (255, 255, 255), 2)
 
         def label_desc(lbl):
@@ -142,29 +152,33 @@ def main():
             return "UNKNOWN (X)", (200, 200, 200)
 
         gt_text, gt_col = label_desc(gt_label)
-        pred_text, pred_col = label_desc(pred_label)
-        base_text, base_col = label_desc(base_label)
+        shivain_text, shivain_col = label_desc(shivain_label)
+        rules_text, rules_col = label_desc(rules_label)
+        base_text, _ = label_desc(base_label)
 
         match_time_s = (current_frame - 11185) / 25.0
         mm = int(max(0, match_time_s) // 60)
         ss = int(max(0, match_time_s) % 60)
 
-        cv2.putText(frame, f"TIME: {mm:02d}:{ss:02d}  (Frame {current_frame})", (hud_x + 15, hud_y + 28),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2, cv2.LINE_AA)
+        cv2.putText(frame, f"TIME: {mm:02d}:{ss:02d}  (Frame {current_frame})", (hud_x + 15, hud_y + 26),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.58, (255, 255, 255), 2, cv2.LINE_AA)
 
-        cv2.putText(frame, f"GROUND TRUTH: {gt_text}", (hud_x + 15, hud_y + 62),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.55, gt_col, 2, cv2.LINE_AA)
+        cv2.putText(frame, f"GROUND TRUTH : {gt_text}", (hud_x + 15, hud_y + 58),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.52, gt_col, 2, cv2.LINE_AA)
 
-        cv2.putText(frame, f"NEW LOGIC   : {pred_text}", (hud_x + 15, hud_y + 97),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.55, pred_col, 2, cv2.LINE_AA)
+        cv2.putText(frame, f"5-GRU PIPELINE: {shivain_text}", (hud_x + 15, hud_y + 90),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.52, shivain_col, 2, cv2.LINE_AA)
 
-        cv2.putText(frame, f"OLD BASELINE: {base_text}", (hud_x + 15, hud_y + 130),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.50, (180, 180, 180), 1, cv2.LINE_AA)
+        cv2.putText(frame, f"YOUR RULES    : {rules_text}", (hud_x + 15, hud_y + 122),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.52, rules_col, 2, cv2.LINE_AA)
+
+        cv2.putText(frame, f"OLD BASELINE  : {base_text}", (hud_x + 15, hud_y + 154),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.48, (170, 170, 170), 1, cv2.LINE_AA)
 
         # Ball visibility status
         ball_status = "TRACKED" if ball is not None else "LOST (NaN)"
         ball_col = (0, 255, 0) if ball is not None else (0, 0, 255)
-        cv2.putText(frame, f"BALL: {ball_status}", (hud_x + 15, hud_y + 152),
+        cv2.putText(frame, f"BALL: {ball_status}", (hud_x + 15, hud_y + 180),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.45, ball_col, 1, cv2.LINE_AA)
 
         out.write(frame)
