@@ -265,6 +265,9 @@ def apply_smart_tagging_priors(match, instances, p_dead, p_home,
     avg_vote = np.zeros(T, dtype=np.float32)
     avg_vote[has_phase] = phase_vote[has_phase] / phase_count[has_phase]
     weight_frame = np.where(obs, 0.35 * phase_logit_weight, 1.0 * phase_logit_weight)
+    # When ball is in fast flight / passing (> 8 m/s), phase prior takes precedence over raw 2D player proximity
+    fast_mask = obs & (bsp >= 8.0)
+    weight_frame[fast_mask] = np.maximum(weight_frame[fast_mask], 2.5 * phase_logit_weight)
     logit_home += weight_frame * avg_vote
 
     # Suppress false dead ball during confirmed active tactical phases
