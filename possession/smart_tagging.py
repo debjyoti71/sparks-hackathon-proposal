@@ -29,7 +29,6 @@ OFFENSIVE_CODES = {
     "LONG BALL",
     "BALL IN FINAL THIRD",
     "BALL IN THE BOX",
-    "PLAYERS IN THE BOX",
 }
 
 DEFENSIVE_CODES = {
@@ -316,6 +315,27 @@ def apply_smart_tagging_priors(match, instances, p_dead, p_home,
         stop_dead = next_kicks[0] if next_kicks else min(T, gb + 35 * fps)
         if stop_dead > goal_frame:
             logit_dead[goal_frame:stop_dead] += restart_dead_boost + 1.0
+
+    # 4. Ball Flight Momentum Rule (Pass & Aerial Clearance Continuity)
+    # When a ball accelerates into high-speed flight (>= 12 m/s, e.g. goalkeeper clearance, long ball),
+    # possession remains with the kicking team while the ball is airborne/traveling.
+    # An opponent merely under the flight path in 2D does NOT intercept unless the ball decelerates
+    # (<= 6.0 m/s) upon reception or physical control.
+    in_flight = False
+    flight_team = None
+    for t in range(1, T):
+        if not in_flight and bsp[t] >= 12.0 and bsp[t - 1] < 12.0:
+            in_flight = True
+            flight_team = 0 if logit_home[t - 1] >= 0.0 else 1
+        elif in_flight:
+            if bsp[t] >= 6.0:
+                if flight_team == 0:
+                    logit_home[t] = max(logit_home[t], 1.1)
+                else:
+                    logit_home[t] = min(logit_home[t], -1.1)
+            else:
+                in_flight = False
+                flight_team = None
 
     p_dead_adj = 1.0 / (1.0 + np.exp(-np.clip(logit_dead, -15, 15)))
     p_home_adj = 1.0 / (1.0 + np.exp(-np.clip(logit_home, -15, 15)))
