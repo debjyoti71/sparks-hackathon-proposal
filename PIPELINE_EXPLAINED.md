@@ -2,7 +2,7 @@
 
 This document explains the code on branch `combined-pipeline`: what each part does, how to run it,
 every experiment we ran, and what each one achieved. It is internal, for the team, and is not the
-technical document for submission (that one still needs writing).
+technical document for submission (that one is `Sparks.md`).
 
 ---
 
@@ -267,6 +267,7 @@ All numbers are mean OOF spellF1 over 3 Metrica games × 3 masks (sim, raw, chal
 | 15 | **Bidirectional GRU blended with the trees** (1 network, 64 units, weight 0.67, trained on GPU) | **0.6759** (chal 0.629 · raw 0.745 · sim 0.653) | superseded by 17 | +0.069 overall, +0.059 on chal; wins in all 9 held-out runs |
 | 16 | GRU ensemble: 5 networks (64 units, 10 epochs), finer blend-weight grid | 0.6876 (chal 0.636 · raw 0.758 · sim 0.669) | superseded by 17 | +0.012 over one GRU |
 | 17 | **GRU ensemble: 5 networks, 128 units, 15 epochs** | **0.6926** (chal 0.648 · raw 0.752 · sim 0.678) | **yes: current final** | +0.017 over one GRU; best on the challenge-like masks and on macroF1 |
+| 18 | Time-shift search on decoded boundaries (−16…+16 frames, `--shift`), and 10 GRUs with 82 s chunks (`--gru-seeds 10 --gru-chunk 512`) | only a marginal change vs 0.6926 | no | gain too small to justify a new final; both remain as opt-in flags |
 
 **Net achievement: 0.5707 → 0.6926 OOF (+0.122), and 0.522 → 0.648 on the challenge-like masks
 (+0.126).** For comparison, the nearest-player baseline idea scores 0.258 on the same masked games.
@@ -345,9 +346,8 @@ Other things established along the way:
 
 Ideas not tried yet, roughly by expected value:
 
-1. **Push the GRU a little further:** 10 networks instead of 5, longer training chunks (512 steps,
-   ~82 s), or 2 layers. These are single flags or small changes. Expected gains are now small
-   (+0.005 to +0.01), so returns are diminishing. Each is judged by row 7, as always.
+1. **GRU tweaks are tapped out:** 10 networks, 82 s chunks and a boundary time shift (#18) gave
+   only marginal changes. Two layers (`--gru-layers 2`) is the last cheap one left; expect little.
 2. **Our own ball detector on the tactical video** (allowed by the rules) to cut the 41% missing
    ball. Highest potential, but a big job.
 3. More turnover-specific features: pass-target inference, a pressing measure on the ball carrier.

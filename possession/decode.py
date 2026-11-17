@@ -26,6 +26,7 @@ class DecodeConfig:
     min_dead_s: float = 1.0     # dead runs shorter than this are merged into a neighbour
     stride: int = 1             # decode on blocks of this many frames (5 is plenty for tuning)
     sw_beta: float = 0.0        # how much the turnover detector lowers / raises c_ha (0 = constant c_ha)
+    shift: int = 0              # frames: delay (+) or advance (-) every decoded boundary, tuned out-of-fold
 
 
 def viterbi(logp, c_ha, c_ld):
@@ -140,6 +141,11 @@ def decode_match(p_dead, p_home, period, cfg=None, fps=25, force_dead=(), p_swit
         else:
             states = viterbi(e, cha, cfg.c_ld)
         states = merge_short_runs(states, int(cfg.min_poss_s * fps), int(cfg.min_dead_s * fps))
+        k = int(cfg.shift)
+        if k > 0:                                   # boundaries later: repeat the first label
+            states = np.concatenate([np.full(k, states[0], dtype=states.dtype), states[:-k]])
+        elif k < 0:                                 # boundaries earlier: repeat the last label
+            states = np.concatenate([states[-k:], np.full(-k, states[-1], dtype=states.dtype)])
         out[idx[0]: idx[-1] + 1] = states
     for a, b in force_dead:
         out[a:b + 1] = np.where(out[a:b + 1] == X, X, D)
@@ -180,7 +186,7 @@ def nearest_player_baseline(match, window=50, fps=25):
 
 def tune_decoder(oof, grid_ha=(5, 10, 20, 40, 80), grid_ld=(3, 6, 12, 25, 50),
                  grid_poss=(0.0, 1.0, 2.0, 3.0, 4.0), grid_dead=(0.0, 0.5, 1.0, 2.0),
-                 tune_stride=5, top_k=3, verbose=True, grid_sw=(0.0,)):
+                 tune_stride=5, top_k=3, verbose=True, grid_sw=(0.0,), grid_shift=(0,)):
     """Two-stage search maximising the mean spellF1 over out-of-fold external games.
 
     oof: list of dicts {name, p_dead, p_home, period, codes}. All probabilities must come from
@@ -217,7 +223,29 @@ def tune_decoder(oof, grid_ha=(5, 10, 20, 40, 80), grid_ld=(3, 6, 12, 25, 50),
                           "min_dead_s": md, **evaluate(cfg)})
     table = pd.concat([stage1, pd.DataFrame(rows2)], ignore_index=True)
     best = table.sort_values(["spell_f1", "macro_f1"], ascending=False).iloc[0]
+    # Stage 3: shift the best decoding in time. Evaluated at full frame resolution (stride 1 decode
+    # would be slow, so the stride-`tune_stride` path is used: the shift is applied after the
+    # blocks are expanded back to frames, so it is still exact to the frame).
+    if any(k != 0 for k in grid_shift):
+        rows3 = []
+        for k in grid_shift:
+            cfg = DecodeConfig(c_ha=best.c_ha, c_ld=best.c_ld, min_poss_s=best.min_poss_s,
+                               min_dead_s=best.min_dead_s, stride=tune_stride, sw_beta=best.sw_beta, shift=int(k))
+            rows3.append({"stage": 3, "c_ha": best.c_ha, "c_ld": best.c_ld, "sw_beta": best.sw_beta,
+                          "min_poss_s": best.min_poss_s, "min_dead_s": best.min_dead_s, "shift": int(k),
+                          **evaluate(cfg)})
+        stage3 = pd.DataFrame(rows3)
+        if verbose:
+            print("stage 3 (shift):\n", stage3[["shift", "spell_f1", "macro_f1"]].to_string(index=False))
+        table = pd.concat([table, stage3], ignore_index=True)
+        zero = stage3[stage3["shift"] == 0]
+        top3 = stage3.sort_values(["spell_f1", "macro_f1"], ascending=False).iloc[0]
+        # a non-zero shift must strictly beat no shift
+        if len(zero) and (top3.spell_f1, top3.macro_f1) <= (zero.iloc[0].spell_f1, zero.iloc[0].macro_f1):
+            top3 = zero.iloc[0]
+        best = top3
+    shift = int(best["shift"]) if "shift" in best.index and not pd.isna(best["shift"]) else 0
     cfg = DecodeConfig(c_ha=float(best.c_ha), c_ld=float(best.c_ld), min_poss_s=float(best.min_poss_s),
-                       min_dead_s=float(best.min_dead_s), stride=1, sw_beta=float(best.sw_beta))
+                       min_dead_s=float(best.min_dead_s), stride=1, sw_beta=float(best.sw_beta), shift=shift)
     return cfg, table
 

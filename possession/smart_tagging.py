@@ -29,6 +29,7 @@ OFFENSIVE_CODES = {
     "LONG BALL",
     "BALL IN FINAL THIRD",
     "BALL IN THE BOX",
+    "PLAYERS IN THE BOX",
 }
 
 DEFENSIVE_CODES = {
@@ -170,8 +171,8 @@ def _pinpoint_kick_frame(match, ball_speed, player_mean_speed, obs, a, b, sp_typ
         if a <= 113742 <= b:
             return 113742
 
-    # Search from the start of the window up to 92% (do not skip the initial 18% of long windows)
-    s0 = a
+    # Search inside the inner [20%, 92%] of the window where the strike occurs
+    s0 = a + int(0.18 * (b - a))
     s1 = a + int(0.92 * (b - a))
     if s1 <= s0:
         s0, s1 = a, b
@@ -179,12 +180,12 @@ def _pinpoint_kick_frame(match, ball_speed, player_mean_speed, obs, a, b, sp_typ
     sub_bsp = np.nan_to_num(ball_speed[s0:s1], nan=0.0)
     sub_obs = obs[s0:s1]
 
-    # Look for the first visible ball frame that accelerates past 3.5 m/s
-    fast_visible = np.flatnonzero(sub_obs & (sub_bsp >= 3.5))
+    # Look for the first visible ball frame that accelerates past 4.5 m/s
+    fast_visible = np.flatnonzero(sub_obs & (sub_bsp >= 4.5))
     if len(fast_visible):
         k = int(fast_visible[0])
         # Walk back a couple of frames to the start of the acceleration impulse
-        while k > 0 and sub_obs[k - 1] and sub_bsp[k - 1] >= 1.5:
+        while k > 0 and sub_obs[k - 1] and sub_bsp[k - 1] >= 2.0:
             k -= 1
         return s0 + k
 
@@ -192,17 +193,16 @@ def _pinpoint_kick_frame(match, ball_speed, player_mean_speed, obs, a, b, sp_typ
     sub_psp = np.nan_to_num(player_mean_speed[s0:s1], nan=0.0)
     score = sub_bsp + 2.0 * np.gradient(sub_bsp) + 1.5 * sub_psp
     if len(score):
-        # Bias slightly toward the middle of the window
-        prior = -0.5 * ((np.linspace(0, 1, len(score)) - 0.5) / 0.35) ** 2
+        # Bias slightly toward ~65% of the window (3.5s into a 5.5s window)
+        prior = -0.5 * ((np.linspace(0, 1, len(score)) - 0.65) / 0.35) ** 2
         return s0 + int(np.argmax(score + prior))
-    return a + int(0.5 * (b - a))
+    return a + int(0.65 * (b - a))
 
 
 def apply_smart_tagging_priors(match, instances, p_dead, p_home,
                                phase_logit_weight=0.55,
                                restart_dead_boost=2.2,
-                               restart_live_boost=2.0,
-                               phase_dead_suppression=0.7):
+                               restart_live_boost=2.0):
     """Combine Smart Tagging set-piece anchors and tactical phase priors with model probabilities.
 
      operates in log-odds space so strong model certainties are respected while ambiguous /
@@ -264,31 +264,16 @@ def apply_smart_tagging_priors(match, instances, p_dead, p_home,
     avg_vote = np.zeros(T, dtype=np.float32)
     avg_vote[has_phase] = phase_vote[has_phase] / phase_count[has_phase]
     weight_frame = np.where(obs, 0.35 * phase_logit_weight, 1.0 * phase_logit_weight)
-    # When ball is in fast flight / passing (> 8 m/s), phase prior takes precedence over raw 2D player proximity
-    fast_mask = obs & (bsp >= 8.0)
-    weight_frame[fast_mask] = np.maximum(weight_frame[fast_mask], 2.5 * phase_logit_weight)
     logit_home += weight_frame * avg_vote
-
-    # Suppress false dead ball during confirmed active tactical phases
-    if phase_dead_suppression > 0:
-        logit_dead[has_phase] -= phase_dead_suppression
-
-    # Active play guard: if in an active tactical phase and ball is observed moving inside pitch,
-    # the ball cannot be dead. Overrule stoppage inertia.
-    active_moving = has_phase & obs & (bsp >= 1.5)
-    logit_dead[active_moving] = np.minimum(logit_dead[active_moving], -1.0)
 
     # 2. Apply Set Piece restart anchors
     set_pieces.sort(key=lambda x: x[1])
     for a, kick, b, team, sp_type in set_pieces:
         # Pre-kick window: the stoppage leading up to `kick`
-        # Extend backward up to 8s before `a` if the ball was already missing or players were slow,
-        # but stop if lookback touches an active tactical phase.
+        # Extend backward up to 8s before `a` if the ball was already missing or players were slow
         pre_start = a
         lookback = max(0, a - 8 * fps)
         for t in range(a - 1, lookback - 1, -1):
-            if has_phase[t]:
-                break
             if not obs[t] or player_mean_sp[t] < 2.2:
                 pre_start = t
             else:
@@ -299,14 +284,12 @@ def apply_smart_tagging_priors(match, instances, p_dead, p_home,
         # Post-kick window: play just restarted at `kick`!
         live_end = min(T, max(b, kick + 2 * fps))
         if live_end > kick:
-            boost_span = min(T, kick + 3 * fps)
-            logit_dead[kick:boost_span] = np.minimum(logit_dead[kick:boost_span], -1.2)
-            logit_dead[boost_span:live_end] -= restart_live_boost
+            logit_dead[kick:live_end] -= restart_live_boost
             if team in (0, 1):
                 sign = 1.0 if team == 0 else -1.0
-                # Stronger team anchor for the first 3 seconds after a known-team set piece
-                team_end = min(T, kick + int(3.0 * fps))
-                logit_home[kick:team_end] += sign * 2.0
+                # Stronger team anchor for the first 2.5 seconds after a known-team set piece
+                team_end = min(T, kick + int(2.5 * fps))
+                logit_home[kick:team_end] += sign * 1.6
 
     # 3. Goals -> dead ball until the next Kick Off restart
     for ga, gb, _ in goals:
@@ -315,42 +298,6 @@ def apply_smart_tagging_priors(match, instances, p_dead, p_home,
         stop_dead = next_kicks[0] if next_kicks else min(T, gb + 35 * fps)
         if stop_dead > goal_frame:
             logit_dead[goal_frame:stop_dead] += restart_dead_boost + 1.0
-
-    # 4. Ball Flight Momentum Rule (Pass & Aerial Clearance Continuity)
-    # When a ball accelerates into high-speed flight (>= 12 m/s, e.g. goalkeeper clearance, long ball),
-    # possession remains with the kicking team while the ball is airborne/traveling.
-    # An opponent merely under the flight path in 2D does NOT intercept unless the ball decelerates
-    # (<= 6.0 m/s) upon reception or physical control.
-    W, Hh = match.pitch
-    out_of_pitch = (filled[:, 0] < -1.0) | (filled[:, 0] > W + 1.0) | (filled[:, 1] < -1.0) | (filled[:, 1] > Hh + 1.0)
-    max_hang_frames = int(4.0 * fps)
-    in_flight = False
-    flight_team = None
-    flight_start = 0
-
-    for t in range(1, T):
-        # Generalization guards: reset on period transitions or ball going out of bounds
-        if match.period[t] != match.period[t - 1] or out_of_pitch[t]:
-            in_flight = False
-            flight_team = None
-            continue
-
-        if not in_flight and bsp[t] >= 12.0 and bsp[t - 1] < 12.0 and logit_dead[t - 1] < 1.0:
-            in_flight = True
-            flight_start = t
-            flight_team = 0 if logit_home[t - 1] >= 0.0 else 1
-        elif in_flight:
-            if t - flight_start > max_hang_frames:
-                in_flight = False
-                flight_team = None
-            elif bsp[t] >= 6.0:
-                if flight_team == 0:
-                    logit_home[t] = max(logit_home[t], 1.1)
-                else:
-                    logit_home[t] = min(logit_home[t], -1.1)
-            else:
-                in_flight = False
-                flight_team = None
 
     p_dead_adj = 1.0 / (1.0 + np.exp(-np.clip(logit_dead, -15, 15)))
     p_home_adj = 1.0 / (1.0 + np.exp(-np.clip(logit_home, -15, 15)))

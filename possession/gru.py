@@ -29,7 +29,7 @@ class GRUConfig:
     hidden: int = 64
     layers: int = 1
     dropout: float = 0.1
-    chunk: int = 256          # sequence length per training sample (256 x 4 frames ~ 41 s)
+    chunk: int = 256          # sequence length per training sample (256 x 4 frames ~ 41 s; 512 ~ 82 s)
     batch: int = 32
     epochs: int = 10
     lr: float = 1e-3
