@@ -2,7 +2,7 @@
 
 **Challenge:** More Than A Hack 2027, Phase 1: Ball Possession
 **Team:** Sparks
-**Repository:** https://github.com/debjyoti71/More-Than-A-Hack-2027---Initial-Challenge---9 (branch `combined-pipeline`)
+**Repository:** https://github.com/debjyoti71/sparks-hackathon-proposal (branch `main`)
 **Submission:** `Sparks.csv`, SHA-256 `5bbb327135ae54ec2557a012b047cc176d4b0dc16b4f69c38eaa8475c961f840`
 
 ---
